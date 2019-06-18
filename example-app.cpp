@@ -27,7 +27,7 @@ int main(int argc, const char* argv[]) {
   //img_to_tensor = ToTensor()
   // module.
   
-  std::string image_path = "../magick_witness.jpg";
+  std::string image_path = "../resize_fallout.jpg";
   //https://github.com/pytorch/pytorch/issues/12506
   
   cv::Mat bgr_image = cv::imread(image_path); // BGR
@@ -102,15 +102,37 @@ int main(int argc, const char* argv[]) {
   std::cout << "cv::mat2 size " << cv_mat2.size() << std::endl;
   
   // out_img_cb = cb.resize(out_img_y.size, Image.BICUBIC)
-
+  
+  cv::Mat out_img_cb = cv::Mat(Y.cols*2,Y.rows*2, CV_32F);
+  //TODO verify... is that the right size, etc.?
+  resize(Cb, out_img_cb, cv::Size(Y.cols*2,Y.rows*2),2.0,2.0, cv::INTER_CUBIC );
 
   // out_img_cr = cr.resize(out_img_y.size, Image.BICUBIC)
 
+  cv::Mat out_img_cr = cv::Mat(Y.cols*2,Y.rows*2, CV_32F);
+  cv::resize(Cr, out_img_cr, cv::Size(Y.cols*2,Y.rows*2),2.0,2.0, cv::INTER_CUBIC );
+  //TODO is this resizing? I thought this was initial size...
 
   // out_img = Image.merge('YCbCr', [out_img_y, out_img_cb, out_img_cr]).convert('RGB')
+
+  cv::Mat YCbCr_output;// = new Mat;
+  std::cout << "" << std::endl;
+  std::cout << "cv_mat2 size " << cv_mat2.size() << std::endl;
+  std::cout << "out_img_cb size " << out_img_cb.size() << std::endl;
+  std::cout << "out_img_cr size " << out_img_cr.size() << std::endl;
+  //uhh
+  out_img_cb.convertTo(out_img_cb, CV_32F); //TODO not ideal
+  out_img_cr.convertTo(out_img_cr, CV_32F); //TODO not ideal
+  //depth is datatype
+  std::cout << "cv_mat2 depth " << cv_mat2.depth() << std::endl; //5
+  std::cout << "out_img_cb depth " << out_img_cb.depth() << std::endl; //0
+  std::cout << "out_img_cr depth " << out_img_cr.depth() << std::endl; //0
+  std::vector<cv::Mat> new_channels = { cv_mat2, out_img_cb, out_img_cr };
+  cv::merge(new_channels, YCbCr_output);
 
   // out_img.save(opt.output_filename)
   // print('output image saved to ', opt.output_filename)
 
+  imwrite( "../cpp-out.jpg", YCbCr_output );
   int a = 1;
 }
