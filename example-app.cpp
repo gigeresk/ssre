@@ -3,11 +3,9 @@
 #include <iostream>
 #include <memory>
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/imgproc.hpp>
-// #include <opencv2/cv.hpp>
+// #include <opencv2/core/core.hpp>
+#include <opencv2/imgcodecs.hpp> // opencv 3.2
+#include <opencv2/imgproc/imgproc.hpp> //colour
 int main(int argc, const char* argv[]) {
   if (argc != 2) {
     std::cerr << "usage: example-app <path-to-exported-script-module>\n";
@@ -24,14 +22,24 @@ int main(int argc, const char* argv[]) {
   //img_to_tensor = ToTensor()
   // module.
   
-    std::string image_path = "../magick_witness.jpg";
+  std::string image_path = "../magick_witness.jpg";
+  //https://github.com/pytorch/pytorch/issues/12506
+  
+  cv::Mat bgr_image = cv::imread(image_path); //BGR
+  /* docs: In the case of color images, the decoded images will have the channels stored in B G R order.  */
+  cv::Mat ycbcr_image;
+  cv::cvtColor(bgr_image, ycbcr_image, cv::COLOR_BGR2YCrCb); 
+  
+  at::Tensor tensor_image = torch::from_blob(ycbcr_image.data, {1, ycbcr_image.rows, ycbcr_image.cols,3}, at::kByte); //TODO is kByte appropriate?
 
-    cv::Mat image = cv::imread(image_path,0);
-  //at::Tensor tensor_image = torch::from_blob(image.data, {1, 3, image.rows, image.cols}, at::kByte);
-  /*tensor_image = tensor_image.to(at::kFloat);
-  */
-  //input = img_to_tensor(y).view(1, -1, y.size[1], y.size[0])
+  // input = img_to_tensor(y).view(1, -1, y.size[1], y.size[0]) //ASSUMING that this is the same as from_blob (verify)
 
+  tensor_image = tensor_image.to(at::kFloat); //will convert the 8-bit values into 32-bit floating points just as if you wrote static_cast<float>(b) where b is a byte
+  //above segfaults (not)
+  /*MODEL*/
+        // std::vector<torch::jit::IValue> inputs;
+        // inputs.emplace_back(tensor_image);
+        // at::Tensor result = module->forward(inputs).toTensor(); 
   // out = model(input)
   // out = out.cpu()
   // out_img_y = out[0].detach().numpy()
