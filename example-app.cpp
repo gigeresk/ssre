@@ -9,13 +9,13 @@
 #include <opencv2/imgcodecs.hpp> // opencv 3.2
 #include <opencv2/imgproc/imgproc.hpp> //colour
 
-// #define _DEBUG 1
+#define _DEBUG 1
 
-// #ifdef _DEBUG // or #ifndef NDEBUG
-// #define LOG_MSG(...) printf(__VA_ARGS__) // Or simply LOG_MSG(msg) printf(msg)
-// #else
-// #define LOG_MSG(...)                     // Or LOG_MSG(msg)
-// #endif
+#ifdef _DEBUG // or #ifndef NDEBUG
+#define LOG_MSG(...) printf(__VA_ARGS__) // Or simply LOG_MSG(msg) printf(msg)
+#else
+#define LOG_MSG(...)                     // Or LOG_MSG(msg)
+#endif
 
 /* TODO
   -cuda
@@ -49,10 +49,25 @@ int main(int argc, const char* argv[]) {
   cv::Mat Y  = chan[0]; //1080x1920 (all) (wait, should be half)
   cv::Mat Cb = chan[1];
   cv::Mat Cr = chan[2]; //TODO optimize
-  
+  /* converting to 32F causes all sorts of problems...
+   */
+
+  //resize and downsize cb
+  cv::Mat out_img_cb_tmp = cv::Mat(Y.cols*2,Y.rows*2, CV_32F);
+  cv::Mat cb_shrink_tmp;
+  cv::resize(Cb, out_img_cb_tmp, cv::Size(Y.cols*2,Y.rows*2),2.0,2.0, cv::INTER_CUBIC );
+   cv::resize(out_img_cb_tmp, cb_shrink_tmp, cv::Size(Y.cols,Y.rows),0.5,0.5, cv::INTER_CUBIC );
+  cv::Mat Y_tmp;
+  cv::Mat Cr_tmp;
+  Y.convertTo(Y_tmp, CV_32F);
+  Y_tmp.convertTo(Y_tmp, CV_8U);
+  cb_shrink_tmp.convertTo(cb_shrink_tmp, CV_32F);
+  cb_shrink_tmp.convertTo(cb_shrink_tmp, CV_8U);
+  Cr.convertTo(Cr_tmp, CV_32F);
+  Cr_tmp.convertTo(Cr_tmp, CV_8U);
   //to debug
   cv::Mat original_out;
-  std::vector<cv::Mat> original_channels = { Y, Cb, Cr };
+  std::vector<cv::Mat> original_channels = { Y_tmp, cb_shrink_tmp, Cr_tmp };
   cv::merge(original_channels, original_out);
   cv::Mat result;
   cv::cvtColor(original_out, result, cv::COLOR_YCrCb2BGR);
@@ -148,14 +163,27 @@ int main(int argc, const char* argv[]) {
   std::cout << "out_img_y depth " << out_img_y.depth() << std::endl; //5
   std::cout << "out_img_cb depth " << out_img_cb.depth() << std::endl; //0
   std::cout << "out_img_cr depth " << out_img_cr.depth() << std::endl; //0
+
+  // need to convert (back) to 8-bit unsigned
+  out_img_y.convertTo(out_img_y, CV_8U);
+  out_img_cb.convertTo(out_img_cb, CV_8U);
+  out_img_cr.convertTo(out_img_cr, CV_8U);
   std::vector<cv::Mat> new_channels = { out_img_y, out_img_cb, out_img_cr };
   cv::merge(new_channels, YCbCr_output);
 
+
+  cv::Mat final_result;
+
+  cv::cvtColor(YCbCr_output, final_result, cv::COLOR_YCrCb2BGR);
   // out_img.save(opt.output_filename)
   // print('output image saved to ', opt.output_filename)
+
+  #ifdef _DEBUG
+  LOG_MSG("Writing Y,Cb,Cr,YCbCr and RGB result to file");
   imwrite( "../Y-out.jpg", out_img_y );
   imwrite( "../Cb-out.jpg", out_img_cb );
   imwrite( "../Cr-out.jpg", out_img_cr );
   imwrite( "../YCbCr-out.jpg", YCbCr_output );
-  LOG_MSG("bruh");
+  imwrite( "../final_result.jpg", final_result );
+  #endif
 }
