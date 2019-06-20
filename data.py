@@ -6,8 +6,16 @@ from torchvision.transforms import Compose, CenterCrop, ToTensor, Resize
 
 from dataset import DatasetFromFolder
 
+TESTING_DIR = "dataset/testing"
+TRAINING_DIR = "dataset/training"
+TEST_URL = "http://www2.eecs.berkeley.edu/Research/Projects/CS/vision/bsds/BSDS300-images.tgz"
+
 
 def download_bsd300(dest="dataset"):
+    """
+    WE SHOULD NOT BE USING THIS
+    Part of the original demo boilerplate, it downloads training images from the BSDS300 repository
+    """
     output_image_dir = join(dest, "BSDS300/images")
 
     if not exists(output_image_dir):
@@ -51,20 +59,15 @@ def target_transform(crop_size):
 
 
 def get_training_set(upscale_factor):
-    root_dir = download_bsd300()
-    train_dir = join(root_dir, "train")
-    crop_size = calculate_valid_crop_size(256, upscale_factor)
-
-    return DatasetFromFolder(train_dir,
-                             input_transform=input_transform(crop_size, upscale_factor),
-                             target_transform=target_transform(crop_size))
+    return get_data_set(upscale_factor, TRAINING_DIR)
 
 
 def get_test_set(upscale_factor):
-    root_dir = download_bsd300()
-    test_dir = join(root_dir, "test")
-    crop_size = calculate_valid_crop_size(256, upscale_factor)
+    return get_data_set(upscale_factor, TESTING_DIR)
 
-    return DatasetFromFolder(test_dir,
+
+def get_data_set(upscale_factor, dir):
+    crop_size = calculate_valid_crop_size(256, upscale_factor)
+    return DatasetFromFolder(dir,
                              input_transform=input_transform(crop_size, upscale_factor),
                              target_transform=target_transform(crop_size))
