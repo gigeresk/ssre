@@ -1,15 +1,13 @@
 -Please use python3
--Need opencv
--Need cuda 10
+-Need opencv (3.2)
+-Need cuda 10 (optional)
 -Need torchlib
 
+There are sub-READMEs in util/, dataset/
 
-TODO
-major
--get opencv linking properly to rewrite this in cpp
-minor
--get super\_resolve to output its models in the /model folder
--move images, etc. to appropriate folder
+Build note: CMakeLists.txt is currently hardcoded to Linux paths on Fred's machine, please change it to suit your needs and delete it from the git repo if necessary.
+
+
 Below is the README for the pytorch example code (python)
 # Superresolution using an efficient sub-pixel convolutional neural network
 

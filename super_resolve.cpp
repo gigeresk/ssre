@@ -91,10 +91,11 @@ int main(int argc, const char* argv[]) {
   #ifdef _DEBUG
   std::cerr << "Super-resolved dimensions: "<< out_img_y.size() << std::endl;
   LOG_MSG("Writing Y,Cb,Cr,YCbCr and RGB result to file");
-  imwrite( "../Y-out.jpg", out_img_y );
-  imwrite( "../Cb-out.jpg", out_img_cb );
-  imwrite( "../Cr-out.jpg", out_img_cr );
-  imwrite( "../YCbCr-out.jpg", YCbCr_output );
-  imwrite( "../final_result.jpg", final_result );
+  //todo do I need to make sure output/ exists?
+  imwrite( "../output/Y-out.jpg", out_img_y );
+  imwrite( "../output/Cb-out.jpg", out_img_cb );
+  imwrite( "../output/Cr-out.jpg", out_img_cr );
+  imwrite( "../output/YCbCr-out.jpg", YCbCr_output );
+  imwrite( "../output/final_result.jpg", final_result );
   #endif
 }
