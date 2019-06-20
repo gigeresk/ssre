@@ -2,6 +2,7 @@ from os.path import exists, join, basename
 from os import makedirs, remove
 from six.moves import urllib
 import tarfile
+import os
 from torchvision.transforms import Compose, CenterCrop, ToTensor, Resize
 
 from dataset import DatasetFromFolder
@@ -58,6 +59,14 @@ def target_transform(crop_size):
     ])
 
 
+def contains_image_data(directory):
+    files = os.listdir(directory)
+    for file in files:
+        if file.lower().endswith(('.png', '.jpg', '.jpeg')):
+            return True
+    return False
+
+
 def get_training_set(upscale_factor):
     return get_data_set(upscale_factor, TRAINING_DIR)
 
@@ -66,8 +75,11 @@ def get_test_set(upscale_factor):
     return get_data_set(upscale_factor, TESTING_DIR)
 
 
-def get_data_set(upscale_factor, dir):
+def get_data_set(upscale_factor, directory):
     crop_size = calculate_valid_crop_size(256, upscale_factor)
-    return DatasetFromFolder(dir,
-                             input_transform=input_transform(crop_size, upscale_factor),
-                             target_transform=target_transform(crop_size))
+    if not contains_image_data(directory):
+        raise Exception("The \'%s\' directory does not contain any image files" % directory)
+    else:
+        return DatasetFromFolder(directory,
+                                 input_transform=input_transform(crop_size, upscale_factor),
+                                 target_transform=target_transform(crop_size))
