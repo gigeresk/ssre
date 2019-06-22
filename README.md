@@ -45,11 +45,24 @@ This example trains a super-resolution network on the [BSD300 dataset](https://w
 
 ### Custom Scripts
 
-To train the CNN, simply place a training video in the `dataset/training` directory
-and a testing video in the `dataset/testing` directory
+#### Producing Training Images
 
-then run: `./train.sh path_to_training_video path_to_testing_video`
+To produce training images for the CNN, simply place a training video in the `dataset/training` directory
+and a testing video in the `dataset/testing` directory, then run the following:
 
-To super resolve using the CNN, simply place your target images in the `/input` directory
+`./dataset/video_slice.sh path_to_training_video path_to_testing_video`
+`./dataset/video_slice.sh path_to_training_video path_to_testing_video`
 
-then run: `./upscale.sh path_to_desired_model_file`
+#### Begin Training
+
+To begin the training process using default parameters, first ensure you have training images in the `dataset/training`
+and `dataset/testing` directories. Then, run the following:
+
+`./train.sh`
+
+#### Super Resolve
+
+To super resolve using the CNN, first ensure you have a desired model you can use, then place your target images in the
+`/input` directory and run the following:
+
+`./upscale.sh path_to_desired_model_file`
