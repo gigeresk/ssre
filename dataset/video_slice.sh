@@ -18,7 +18,7 @@ rm -f $BASEDIR/*.jpeg
 filename=$(echo "$BASENAME" | cut -f 1 -d '.')
 
 echo --- Running Frame Slicing
-eval "ffmpeg -hide_banner -loglevel info -i $1 -r 30 $BASEDIR/${filename}-%03d.png"
+eval "ffmpeg -hide_banner -loglevel info -i $1 -r 30 $BASEDIR/$filename-%03d.png"
 if [ $? -ne 0 ]; then
     echo "--- Video slicing failed"
     exit 1
