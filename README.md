@@ -41,3 +41,15 @@ This example trains a super-resolution network on the [BSD300 dataset](https://w
 
 ### Super Resolve
 `python super_resolve.py --input_image dataset/BSDS300/images/test/16077.jpg --model model_epoch_500.pth --output_filename out.png`
+
+
+### Custom Scripts
+
+To train the CNN, simply place a training video in the `dataset/training` directory
+and a testing video in the `dataset/testing` directory
+
+then run: `./train.sh path_to_training_video path_to_testing_video`
+
+To super resolve using the CNN, simply place your target images in the `/input` directory
+
+then run: `./upscale.sh path_to_desired_model_file`
