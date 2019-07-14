@@ -1,3 +1,12 @@
 build/
 __pycache__/
 .vscode/
+.idea/
+
+# Ignore the data inside the training/testing folders
+/dataset/training/*
+/dataset/testing/*
+
+# This exception ensures that training/testing folders will be visible in git
+!dataset/training/.gitkeep
+!dataset/testing/.gitkeep
