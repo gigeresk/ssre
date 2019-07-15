@@ -27,12 +27,18 @@
   -https://github.com/pytorch/pytorch/issues/12506s
  */
 
-std::vector<uchar> loadImage(std::string image_path){
+int loadImage(std::string image_path, std::vector<uchar> *buf){
 
   cv::Mat bgr_image = cv::imread(image_path, cv::IMREAD_COLOR );
-  std::vector<uchar> buf;
-  cv::imencode(".jpg", bgr_image, buf);
-  return buf;
+  // std::vector<uchar>* buf;
+  try{
+    cv::imencode(".jpg", bgr_image, *buf);
+  }
+  catch(...){
+    std::cerr << "Could not encode image into memory";
+    return 1;
+  }
+  return 0;
 }
 
 int main(int argc, const char* argv[]) {
@@ -48,7 +54,12 @@ int main(int argc, const char* argv[]) {
   std::cout << "ok, loaded module\n";
 
   // we decode the image in another subroutine, as a proof of concept
-  std::vector<uchar> buf = loadImage(argv[2]);
+  std::vector<uchar> buf;
+  if ( loadImage(argv[2], &buf) ) {
+    std::cerr << "Could not load image from memory";
+    return 1;
+  }
+  
   cv::Mat bgr_image = cv::imdecode(buf,cv::IMREAD_COLOR);
   cv::Mat ycbcr_image;
 
