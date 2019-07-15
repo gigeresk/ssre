@@ -44,7 +44,7 @@ def calculate_valid_crop_size(crop_size, upscale_factor):
     return crop_size - (crop_size % upscale_factor)
 
 
-def input_transform(crop_size, upscale_factor):
+def prediction_transform(crop_size, upscale_factor):
     return Compose([
         CenterCrop(crop_size),
         Resize(crop_size // upscale_factor),
@@ -81,5 +81,5 @@ def get_data_set(upscale_factor, directory):
         raise Exception("The \'%s\' directory does not contain any image files" % directory)
     else:
         return DatasetFromFolder(directory,
-                                 input_transform=input_transform(crop_size, upscale_factor),
+                                 prediction_transform=prediction_transform(crop_size, upscale_factor),
                                  target_transform=target_transform(crop_size))

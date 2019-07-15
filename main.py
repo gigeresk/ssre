@@ -1,5 +1,6 @@
 from __future__ import print_function
 import argparse
+import time
 from math import log10
 
 import torch
@@ -20,6 +21,8 @@ parser.add_argument('--cuda', action='store_true', help='use cuda?')
 parser.add_argument('--threads', type=int, default=4, help='number of threads for data loader to use')
 parser.add_argument('--seed', type=int, default=123, help='random seed to use. Default=123')
 opt = parser.parse_args()
+# START TIMER
+start = time.time()
 
 print(opt)
 
@@ -49,7 +52,8 @@ def train(epoch):
         input, target = batch[0].to(device), batch[1].to(device)
 
         optimizer.zero_grad()
-        loss = criterion(model(input), target)
+        prediction = model(input)
+        loss = criterion(prediction, target)
         epoch_loss += loss.item()
         loss.backward()
         optimizer.step()
@@ -77,7 +81,13 @@ def checkpoint(epoch):
     torch.save(model, model_out_path)
     print("Checkpoint saved to {}".format(model_out_path))
 
+
 for epoch in range(1, opt.nEpochs + 1):
     train(epoch)
     test()
     checkpoint(epoch)
+
+# END TIMER
+end = time.time()
+print("Total duration in seconds: ")
+print(end - start)
