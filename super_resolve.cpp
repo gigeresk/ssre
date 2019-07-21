@@ -9,7 +9,7 @@
 #include <opencv2/imgcodecs.hpp> // opencv 3.2
 #include <opencv2/imgproc/imgproc.hpp> //colour
 
-// #define _DEBUG 1
+#define _DEBUG 1
 
 #ifdef _DEBUG // or #ifndef NDEBUG
 #define LOG_MSG(...) printf(__VA_ARGS__) // Or simply LOG_MSG(msg) printf(msg)
@@ -27,9 +27,23 @@
   -https://github.com/pytorch/pytorch/issues/12506s
  */
 
+int loadImage(std::string image_path, std::vector<uchar> *buf){
+
+  cv::Mat bgr_image = cv::imread(image_path, cv::IMREAD_COLOR );
+  // std::vector<uchar>* buf;
+  try{
+    cv::imencode(".jpg", bgr_image, *buf);
+  }
+  catch(...){
+    std::cerr << "Could not encode image into memory";
+    return 1;
+  }
+  return 0;
+}
+
 int main(int argc, const char* argv[]) {
-  if (argc != 2) {
-    std::cerr << "usage: example-app <path-to-exported-script-module>\n";
+  if (argc != 3) {
+    std::cerr << "usage: example-app <path-to-exported-script-module> <path-to-image> \n";
     return -1;
   }
 
@@ -39,9 +53,14 @@ int main(int argc, const char* argv[]) {
   assert(module != nullptr);
   std::cout << "ok, loaded module\n";
 
-  std::string image_path = "../resize_witness.jpg";
+  // we decode the image in another subroutine, as a proof of concept
+  std::vector<uchar> buf;
+  if ( loadImage(argv[2], &buf) ) {
+    std::cerr << "Could not load image from memory";
+    return 1;
+  }
   
-  cv::Mat bgr_image = cv::imread(image_path); // BGR
+  cv::Mat bgr_image = cv::imdecode(buf,cv::IMREAD_COLOR);
   cv::Mat ycbcr_image;
 
   cv::cvtColor(bgr_image, ycbcr_image, cv::COLOR_BGR2YCrCb);
@@ -90,12 +109,12 @@ int main(int argc, const char* argv[]) {
 
   #ifdef _DEBUG
   std::cerr << "Super-resolved dimensions: "<< out_img_y.size() << std::endl;
-  LOG_MSG("Writing Y,Cb,Cr,YCbCr and RGB result to file");
+  LOG_MSG("Writing Y,Cb,Cr,YCbCr and RGB result to file\n");
   //todo do I need to make sure output/ exists?
-  imwrite( "../output/Y-out.jpg", out_img_y );
-  imwrite( "../output/Cb-out.jpg", out_img_cb );
-  imwrite( "../output/Cr-out.jpg", out_img_cr );
-  imwrite( "../output/YCbCr-out.jpg", YCbCr_output );
-  imwrite( "../output/final_result.jpg", final_result );
+  imwrite( "output/Y-out.jpg", out_img_y );
+  imwrite( "output/Cb-out.jpg", out_img_cb );
+  imwrite( "output/Cr-out.jpg", out_img_cr );
+  imwrite( "output/YCbCr-out.jpg", YCbCr_output );
+  imwrite( "output/final_result.jpg", final_result );
   #endif
 }
