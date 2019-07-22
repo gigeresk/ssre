@@ -9,6 +9,14 @@ nEpochs 30
 Learning Rate 0.001
 CUDA enabled
 
+Training Data:
+12 min Witcher 3 no HUD gameplay footage, 1080p (22067 images)
+(originally 60fps but captured at 30fps so maybe some artifacts)
+
+Testing Data:
+5 min Witcher 3 no HUD gameplay footage, 1080p (10453 images)
+(originally 60fps but captured at 30fps so maybe some artifacts)
+
 Neural Network Structure:
 Default network structure of 4 layers
 
