@@ -1,8 +1,8 @@
 Date:
-Jul 21, 2019
+Jul 21 - 22, 2019
 
 Training Parameters:
-Upscale factor 4
+Upscale factor 2
 Batch Size 4
 Test Batch Size 4
 nEpochs 30
@@ -21,5 +21,5 @@ Neural Network Structure:
 Default network structure of 4 layers
 
 Notes:
-Training performance peaked in the 2nd epoch, this is why training terminated early in the 11th epoch
-Seems like our NN isn't capable of holding enough information, may need to add additional layers
+Training performance peaked at around 36.8 dB with an avg loss of around 0.0002
+Seems like our NN isn't capable of holding enough information beyond this point, may need to add additional layers
