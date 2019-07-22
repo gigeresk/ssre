@@ -27,94 +27,122 @@
   -https://github.com/pytorch/pytorch/issues/12506s
  */
 
+
 int loadImage(std::string image_path, std::vector<uchar> *buf){
 
-  cv::Mat bgr_image = cv::imread(image_path, cv::IMREAD_COLOR );
-  // std::vector<uchar>* buf;
-  try{
-    cv::imencode(".jpg", bgr_image, *buf);
-  }
-  catch(...){
-    std::cerr << "Could not encode image into memory";
-    return 1;
-  }
-  return 0;
+    cv::Mat bgr_image = cv::imread(image_path, cv::IMREAD_COLOR );
+    // std::vector<uchar>* buf;
+    try{
+        cv::imencode(".jpg", bgr_image, *buf);
+    }
+    catch(...){
+        std::cerr << "Could not encode image into memory";
+        return 1;
+    }
+    return 0;
 }
 
+// int loadImageFolder(std::string image_path_dir, std::vector<std:vector<uchar>* > buf_array){
+//     std::vector<string> filenames; // list of filenames in image dir
+//     cv::glob(image_path_dir,fn,false);
+
+// }
 int main(int argc, const char* argv[]) {
-  if (argc != 3) {
-    std::cerr << "usage: example-app <path-to-exported-script-module> <path-to-image> \n";
-    return -1;
-  }
+    
+    // time_t initial_time, load_time, upscaling_time, final_time;
+    std::chrono::high_resolution_clock::time_point initial_time = std::chrono::high_resolution_clock::now();
 
-  // Deserialize the ScriptModule from a file using torch::jit::load().
-  std::shared_ptr<torch::jit::script::Module> module = torch::jit::load(argv[1]);
+    if (argc != 3) {
+        std::cerr << "usage: example-app <path-to-exported-script-module> <path-to-image> \n";
+        return -1;
+    }
 
-  assert(module != nullptr);
-  std::cout << "ok, loaded module\n";
+    // Deserialize the ScriptModule from a file using torch::jit::load().
+    std::shared_ptr<torch::jit::script::Module> module = torch::jit::load(argv[1]);
 
-  // we decode the image in another subroutine, as a proof of concept
-  std::vector<uchar> buf;
-  if ( loadImage(argv[2], &buf) ) {
-    std::cerr << "Could not load image from memory";
-    return 1;
-  }
-  
-  cv::Mat bgr_image = cv::imdecode(buf,cv::IMREAD_COLOR);
-  cv::Mat ycbcr_image;
+    assert(module != nullptr);
+    std::cout << "ok, loaded module\n";
 
-  cv::cvtColor(bgr_image, ycbcr_image, cv::COLOR_BGR2YCrCb);
-  std::vector<cv::Mat> chan;
-  cv::split(ycbcr_image,chan);
-  cv::Mat Y  = chan[0];
-  cv::Mat Cb = chan[1];
-  cv::Mat Cr = chan[2]; //TODO optimize
+    // we decode the image in another subroutine, as a proof of concept
+    std::vector<uchar> buf;
+    if ( loadImage(argv[2], &buf) ) {
+        std::cerr << "Could not load image from memory";
+        return 1;
+    }
 
-  //convert Y channel to tensor
-  at::Tensor tensor_image = torch::from_blob(Y.data, {1, 1, Y.rows, Y.cols}, at::kByte); //TODO is kByte appropriate?
-  tensor_image = tensor_image.to(at::kFloat); //will convert the 8-bit values into 32-bit floating points just as if you wrote static_cast<float>(b) where b is a byte
+    cv::Mat bgr_image = cv::imdecode(buf,cv::IMREAD_COLOR);
+    cv::Mat ycbcr_image;
 
-  /*MODEL*/
-  std::vector<torch::jit::IValue> inputs;
-  inputs.emplace_back(tensor_image); //TODO pushback vs emplace back?
-  at::Tensor output = module->forward(inputs).toTensor();
+    cv::cvtColor(bgr_image, ycbcr_image, cv::COLOR_BGR2YCrCb);
+    std::vector<cv::Mat> chan;
+    cv::split(ycbcr_image,chan);
+    cv::Mat Y  = chan[0];
+    cv::Mat Cb = chan[1];
+    cv::Mat Cr = chan[2]; //TODO optimize
 
-  at::Tensor detached_output = output[0].detach();
+    //convert Y channel to tensor
+    at::Tensor tensor_image = torch::from_blob(Y.data, {1, 1, Y.rows, Y.cols}, at::kByte); //TODO is kByte appropriate?
+    tensor_image = tensor_image.to(at::kFloat); //will convert the 8-bit values into 32-bit floating points just as if you wrote static_cast<float>(b) where b is a byte
 
-  const std::vector< int > size_vec = {Y.rows*2 ,Y.cols *2};
-  cv::Mat out_img_y = cv::Mat(size_vec, CV_32F);
+    /*MODEL*/
+    std::vector<torch::jit::IValue> inputs;
+    inputs.emplace_back(tensor_image); //TODO pushback vs emplace back?
+    
 
-  std::memcpy((void *) out_img_y.data, detached_output[0].data_ptr(), 4*detached_output.numel()); //TODO important: detached_output[0] vs detached_output (above line) 
-  //keep one of above...
+    std::chrono::high_resolution_clock::time_point load_time = std::chrono::high_resolution_clock::now();
 
-  // Seem not to need to clip between 0.0 and 255.0
+    at::Tensor output = module->forward(inputs).toTensor();
 
-  cv::Mat out_img_cb = cv::Mat(Y.cols*2,Y.rows*2, CV_32F);
-  cv::resize(Cb, out_img_cb, cv::Size(Y.cols*2,Y.rows*2),2.0,2.0, cv::INTER_CUBIC );
+    std::chrono::high_resolution_clock::time_point upscaling_time = std::chrono::high_resolution_clock::now();
 
-  cv::Mat out_img_cr = cv::Mat(Y.cols*2,Y.rows*2, CV_32F);
-  cv::resize(Cr, out_img_cr, cv::Size(Y.cols*2,Y.rows*2),2.0,2.0, cv::INTER_CUBIC );
+    at::Tensor detached_output = output[0].detach();
 
-  cv::Mat YCbCr_output;
+    const std::vector< int > size_vec = {Y.rows*2 ,Y.cols *2};
+    cv::Mat out_img_y = cv::Mat(size_vec, CV_32F);
 
-  // need to convert Y (back) to 8-bit unsigned
-  out_img_y.convertTo(out_img_y, CV_8U);
+    std::memcpy((void *) out_img_y.data, detached_output[0].data_ptr(), 4*detached_output.numel()); //TODO important: detached_output[0] vs detached_output (above line) 
+    //keep one of above...
 
-  std::vector<cv::Mat> new_channels = { out_img_y, out_img_cb, out_img_cr };
-  cv::merge(new_channels, YCbCr_output);
+    // Seem not to need to clip between 0.0 and 255.0
 
-  cv::Mat final_result;
+    cv::Mat out_img_cb = cv::Mat(Y.cols*2,Y.rows*2, CV_32F);
+    cv::resize(Cb, out_img_cb, cv::Size(Y.cols*2,Y.rows*2),2.0,2.0, cv::INTER_CUBIC );
 
-  cv::cvtColor(YCbCr_output, final_result, cv::COLOR_YCrCb2BGR);
+    cv::Mat out_img_cr = cv::Mat(Y.cols*2,Y.rows*2, CV_32F);
+    cv::resize(Cr, out_img_cr, cv::Size(Y.cols*2,Y.rows*2),2.0,2.0, cv::INTER_CUBIC );
 
-  #ifdef _DEBUG
-  std::cerr << "Super-resolved dimensions: "<< out_img_y.size() << std::endl;
-  LOG_MSG("Writing Y,Cb,Cr,YCbCr and RGB result to file\n");
-  //todo do I need to make sure output/ exists?
-  imwrite( "output/Y-out.jpg", out_img_y );
-  imwrite( "output/Cb-out.jpg", out_img_cb );
-  imwrite( "output/Cr-out.jpg", out_img_cr );
-  imwrite( "output/YCbCr-out.jpg", YCbCr_output );
-  imwrite( "output/final_result.jpg", final_result );
-  #endif
+    cv::Mat YCbCr_output;
+
+    // need to convert Y (back) to 8-bit unsigned
+    out_img_y.convertTo(out_img_y, CV_8U);
+
+    std::vector<cv::Mat> new_channels = { out_img_y, out_img_cb, out_img_cr };
+    cv::merge(new_channels, YCbCr_output);
+
+    cv::Mat final_result;
+
+    cv::cvtColor(YCbCr_output, final_result, cv::COLOR_YCrCb2BGR);
+   
+    std::chrono::high_resolution_clock::time_point final_time = std::chrono::high_resolution_clock::now();
+
+
+    std::chrono::duration<double> load_timespan = std::chrono::duration_cast<std::chrono::duration<double>>(load_time - initial_time);
+    std::chrono::duration<double> upscaling_timespan = std::chrono::duration_cast<std::chrono::duration<double>>(upscaling_time - load_time);
+    std::chrono::duration<double> final_timespan = std::chrono::duration_cast<std::chrono::duration<double>>(final_time - upscaling_time);
+    std::chrono::duration<double> total_timespan = std::chrono::duration_cast<std::chrono::duration<double>>(final_time - initial_time);
+    std::cout << "Loading took "        << load_timespan.count()        << " seconds" << std::endl;
+    std::cout << "Upscaling took "      << upscaling_timespan.count()   << " seconds" << std::endl;
+    std::cout << "Finalizing took "     << final_timespan.count()       << " seconds" << std::endl;
+    std::cout << "Entire program took " << total_timespan.count()       << " seconds" << std::endl;
+
+    #ifdef _DEBUG
+    std::cerr << "Super-resolved dimensions: "<< out_img_y.size() << std::endl;
+    LOG_MSG("Writing Y,Cb,Cr,YCbCr and RGB result to file\n");
+    //todo do I need to make sure output/ exists?
+    imwrite( "output/Y-out.jpg", out_img_y );
+    imwrite( "output/Cb-out.jpg", out_img_cb );
+    imwrite( "output/Cr-out.jpg", out_img_cr );
+    imwrite( "output/YCbCr-out.jpg", YCbCr_output );
+    imwrite( "output/final_result.jpg", final_result );
+    #endif
 }
