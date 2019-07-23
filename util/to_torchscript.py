@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, './archive/witcher3_2x/')
 '''
 Used this code to see how I could go about using the Python Pytorch-trained NN in C++
 Torch Script is a representation of a PyTorch model that can be understood, compiled and serialized by the Torch Script compiler
@@ -15,7 +17,7 @@ import argparse
 
 
 parser = argparse.ArgumentParser(description='PyTorch Super Res Example')
-parser.add_argument('--model', type=str, required=True, help='model file to use')
+parser.add_argument('--modell', type=str, required=True, help='model file to use')
 parser.add_argument('--input_image', type=str, required=True, help='input image to use to trace the original NN')
 parser.add_argument('--input_image2', type=str, required=True, help='input image to use with the traced NN')
 opt = parser.parse_args()
@@ -23,13 +25,12 @@ opt = parser.parse_args()
 
 print(opt)
 
-model = torch.load(opt.model)
 # An instance of your model.
 
 img = Image.open(opt.input_image).convert('YCbCr')
 y, cb, cr = img.split()
 
-model = torch.load(opt.model)
+modell = torch.load(opt.modell,map_location='cpu' )
 img_to_tensor = ToTensor()
 input = img_to_tensor(y).view(1, -1, y.size[1], y.size[0])
 
@@ -37,7 +38,7 @@ input = img_to_tensor(y).view(1, -1, y.size[1], y.size[0])
 example = torch.rand(1, 3, 224, 224)
 example = input
 # Use torch.jit.trace to generate a torch.jit.ScriptModule via tracing.
-traced_script_module = torch.jit.trace(model, example)
+traced_script_module = torch.jit.trace(modell, example)
 
 img = Image.open(opt.input_image2).convert('YCbCr')
 y, cb, cr = img.split()
@@ -61,6 +62,6 @@ out_img.save('ts-out.jpg')
 
 
 
-
+print("bout to write dat tracedshit")
 #write traced script module to file
-traced_script_module.save("traced-script-module.pt")
+traced_script_module.save("traced-script-module-witcher2x.pt")
