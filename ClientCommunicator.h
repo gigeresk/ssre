@@ -11,73 +11,76 @@ class MutexSharedBuffer
 {
 private:
     HANDLE fileMap;
-    HANDLE mutex;
-    HANDLE newDataSem;
+    HANDLE dataRead;
+    HANDLE dataWritten;
     LPTCH mappedBuffer;
 
     long bufferSize;
 
-    void OpenExisting(string& mutexName, string& bufferName, string& semaphoreName)
+    bool createdNewObjects;
+
+    void OpenExisting(string& bufferName, string& rSemName, string& wSemName)
     {
-        fileMap = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, bufferName.c_str());
-        mutex = OpenMutex(MUTEX_ALL_ACCESS, FALSE, mutexName.c_str());
-        std::cout << GetLastError() << std::endl;
-        newDataSem = OpenSemaphore(SEMAPHORE_ALL_ACCESS, FALSE, semaphoreName.c_str());
+        fileMap     = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, bufferName.c_str());
+        dataRead    = OpenSemaphore(SEMAPHORE_ALL_ACCESS, FALSE, rSemName.c_str());
+        dataWritten = OpenSemaphore(SEMAPHORE_ALL_ACCESS, FALSE, wSemName.c_str());
+        createdNewObjects = false;
     }
 
-    void CreateNew(string& mutexName, string& bufferName, string& semaphoreName)
+    void CreateNew(string& bufferName, string& rSemName, string& wSemName)
     {
-        fileMap = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, bufferSize, bufferName.c_str());
-        mutex = CreateMutex(NULL, FALSE, mutexName.c_str());
-        std::cout << GetLastError() << std::endl;
-        newDataSem = CreateSemaphoreA(NULL, 0, 1, semaphoreName.c_str());
+        fileMap     = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, bufferSize, bufferName.c_str());
+        dataRead    = CreateSemaphoreA(NULL, 1, 1, rSemName.c_str()); // wait for first w before r
+        dataWritten = CreateSemaphoreA(NULL, 0, 1, wSemName.c_str()); // w right away
+        createdNewObjects = true;
     }
 
 public:
     MutexSharedBuffer(string name, long size)
     {
         bufferSize = size;
-        string mutexName = name + "_mutex";
         string bufferName = name + "_buffer";
-        string semaphoreName = name + "_sem";
-        OpenExisting(mutexName, bufferName, semaphoreName);
+        string rSemName = name   + "_rsem";
+        string wSemName = name   + "_wsem";
+
+        OpenExisting(bufferName, rSemName, wSemName);
 
         mappedBuffer = (LPTCH)MapViewOfFile(fileMap, FILE_MAP_ALL_ACCESS, 0, 0, bufferSize);
 
-        assert(fileMap != NULL);
+        assert(fileMap      != NULL);
         assert(mappedBuffer != NULL);
-        assert(mutex != NULL);
-        assert(newDataSem != NULL);
+        assert(dataWritten  != NULL);
+        assert(dataRead     != NULL);
+
     }
 
     ~MutexSharedBuffer()
     {
         UnmapViewOfFile(mappedBuffer);
-        CloseHandle(fileMap);
-        CloseHandle(mutex);
-        CloseHandle(newDataSem);
+        if (createdNewObjects)
+        {
+            CloseHandle(fileMap);
+            CloseHandle(dataRead);
+            CloseHandle(dataWritten);
+        }
     }
 
     void Write(LPTCH bytes, int numBytes)
     {
-        WaitForSingleObject(mutex, INFINITE);
+        WaitForSingleObject(dataRead, INFINITE);
 
         memcpy(mappedBuffer, bytes, numBytes);
 
-        ReleaseMutex(mutex);
-
-        ReleaseSemaphore(newDataSem, 1, NULL);
+        ReleaseSemaphore(dataWritten, 1, NULL);
     }
 
     void Read(LPTCH bytes, int numBytesToRead)
     {
-        WaitForSingleObject(newDataSem, INFINITE);
-
-        WaitForSingleObject(mutex, INFINITE);
+        WaitForSingleObject(dataWritten, INFINITE);
 
         memcpy(bytes, mappedBuffer, numBytesToRead);
 
-        ReleaseMutex(mutex);
+        ReleaseSemaphore(dataRead, 1, NULL);
     }
 };
 
