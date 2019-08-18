@@ -2,6 +2,8 @@
 VS: DO NOT BUILD IN DEBUG, ONLY RELEASE: https://github.com/pytorch/pytorch/issues/15919
 */
 
+#define ENGINE 1
+
 #include <torch/script.h> // One-stop header.
 #include <iostream>
 #include <memory>
@@ -41,6 +43,9 @@ clk::time_point initial_time;
 clk::time_point load_time;
 clk::time_point upscaling_time;
 clk::time_point final_time;
+
+clk::time_point input_ready_time;
+clk::time_point output_ready_time;
 
 std::vector<cv::Mat> ycrcb_channels(3);
 
@@ -87,7 +92,18 @@ inline void super_resolve(cv::Mat& ycbcr_image, module_ptr& module, cv::Mat& fin
 
     load_time = clk::now();
 
-    at::Tensor output = module->forward(inputs).toTensor().to(torch::kCPU);
+    c10::IValue output_ivalue = module->forward(inputs); // This is the big ese (true no fx unless pinned & host->cuda)
+
+    // Seem not to need to clip between 0.0 and 255.0
+
+    cv::Mat out_img_cb = cv::Mat(Y.cols * 2, Y.rows * 2, CV_32F);
+    cv::resize(Cb, out_img_cb, cv::Size(Y.cols * 2, Y.rows * 2), 2.0, 2.0, cv::INTER_CUBIC);
+
+    cv::Mat out_img_cr = cv::Mat(Y.cols * 2, Y.rows * 2, CV_32F);
+    cv::resize(Cr, out_img_cr, cv::Size(Y.cols * 2, Y.rows * 2), 2.0, 2.0, cv::INTER_CUBIC);
+
+    at::Tensor output_cuda = output_ivalue.toTensor();
+    at::Tensor output = output_cuda.to(torch::kCPU);
 
     upscaling_time = clk::now();
 
@@ -98,14 +114,6 @@ inline void super_resolve(cv::Mat& ycbcr_image, module_ptr& module, cv::Mat& fin
 
     std::memcpy((void*)out_img_y.data, detached_output[0].data_ptr(), 4 * detached_output.numel()); //TODO important: detached_output[0] vs detached_output (above line) 
     //keep one of above...
-
-    // Seem not to need to clip between 0.0 and 255.0
-
-    cv::Mat out_img_cb = cv::Mat(Y.cols * 2, Y.rows * 2, CV_32F);
-    cv::resize(Cb, out_img_cb, cv::Size(Y.cols * 2, Y.rows * 2), 2.0, 2.0, cv::INTER_CUBIC);
-
-    cv::Mat out_img_cr = cv::Mat(Y.cols * 2, Y.rows * 2, CV_32F);
-    cv::resize(Cr, out_img_cr, cv::Size(Y.cols * 2, Y.rows * 2), 2.0, 2.0, cv::INTER_CUBIC);
 
     cv::Mat YCbCr_output;
 
@@ -180,6 +188,9 @@ int main(int argc, const char* const argv[]) {
     while (true)
     {
         communicator.GetSRInputs();
+        
+        input_ready_time = clk::now();
+
         cv::Mat bgr_image;
         cv::Mat rgba_bitmap = cv::Mat(1080/2, 1920/2, CV_8UC4, decodedBytes);
         cv::cvtColor(rgba_bitmap, bgr_image, cv::COLOR_RGBA2BGR);
@@ -188,6 +199,12 @@ int main(int argc, const char* const argv[]) {
         super_resolve(ycbcr_image, module, final_result);
 
         communicator.ReturnSROutputs((LPTCH) final_result.data);
+        
+        output_ready_time = clk::now();
+        
+        std::cout << "Upscale: " << std::chrono::duration_cast<std::chrono::duration<double>>(upscaling_time - load_time).count() << std::endl;
+        std::cout << "Total: " << std::chrono::duration_cast<std::chrono::duration<double>>(output_ready_time - input_ready_time).count() << std::endl;
+
     }
 #endif // !ENGINE
 

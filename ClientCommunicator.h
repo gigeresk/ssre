@@ -7,88 +7,128 @@
 #include <iostream>
 using namespace std;
 
-class MutexSharedBuffer
+class SynchronizedUpscaleBuffer
 {
 private:
-    HANDLE fileMap;
-    HANDLE dataRead;
-    HANDLE dataWritten;
-    LPTCH mappedBuffer;
+    HANDLE inputReady;
+    HANDLE outputReady;
 
-    long bufferSize;
+    HANDLE inputFileMap;
+    long inputBufferSize;
+    LPTCH inputMappedBuffer;
 
-    bool createdNewObjects;
+    HANDLE outputFileMap;
+    long outputBufferSize;
+    LPTCH outputMappedBuffer;
 
-    void OpenExisting(string& bufferName, string& rSemName, string& wSemName)
+    bool createdNewObjects; // help determine if I should clean up
+
+    void OpenExisting(
+        string& inputBufferName,
+        string& outputBufferName,
+        string& inputSemName,
+        string& outputSemName
+    )
     {
-        fileMap     = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, bufferName.c_str());
-        dataRead    = OpenSemaphore(SEMAPHORE_ALL_ACCESS, FALSE, rSemName.c_str());
-        dataWritten = OpenSemaphore(SEMAPHORE_ALL_ACCESS, FALSE, wSemName.c_str());
+        inputFileMap     = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, inputBufferName.c_str());
+        outputFileMap    = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, outputBufferName.c_str());
+
+        inputReady       = OpenSemaphore(SEMAPHORE_ALL_ACCESS, FALSE, inputSemName.c_str());
+        outputReady      = OpenSemaphore(SEMAPHORE_ALL_ACCESS, FALSE, outputSemName.c_str());
+
         createdNewObjects = false;
     }
 
-    void CreateNew(string& bufferName, string& rSemName, string& wSemName)
+    void CreateNew(string& inputBufferName, string& outputBufferName, string& inputSemName, string& outputSemName)
     {
-        fileMap     = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, bufferSize, bufferName.c_str());
-        dataRead    = CreateSemaphoreA(NULL, 1, 1, rSemName.c_str()); // wait for first w before r
-        dataWritten = CreateSemaphoreA(NULL, 0, 1, wSemName.c_str()); // w right away
+        inputFileMap = CreateFileMappingA(
+            INVALID_HANDLE_VALUE,
+            NULL,
+            PAGE_READWRITE,
+            0,
+            inputBufferSize,
+            inputBufferName.c_str()
+        );
+        outputFileMap = CreateFileMappingA(
+            INVALID_HANDLE_VALUE,
+            NULL,
+            PAGE_READWRITE,
+            0,
+            outputBufferSize,
+            outputBufferName.c_str()
+        );
+
+        inputReady  = CreateSemaphoreA(NULL, 0, 1, inputSemName.c_str());
+        outputReady = CreateSemaphoreA(NULL, 0, 1, outputSemName.c_str());
         createdNewObjects = true;
     }
 
 public:
-    MutexSharedBuffer(string name, long size)
+    SynchronizedUpscaleBuffer(string name, long inputSize, long outputSize)
     {
-        bufferSize = size;
-        string bufferName = name + "_buffer";
-        string rSemName = name   + "_rsem";
-        string wSemName = name   + "_wsem";
+        string inputBufferName  = name + "_inputbuffer";
+        string outputBufferName = name + "_outputbuffer";
+        string inputSemName     = name + "_inputsem";
+        string outputSemName    = name + "_outputsem";
 
-        OpenExisting(bufferName, rSemName, wSemName);
+        inputBufferSize  = inputSize;
+        outputBufferSize = outputSize;
 
-        mappedBuffer = (LPTCH)MapViewOfFile(fileMap, FILE_MAP_ALL_ACCESS, 0, 0, bufferSize);
+        OpenExisting(inputBufferName, outputBufferName, inputSemName, outputSemName);
 
-        assert(fileMap      != NULL);
-        assert(mappedBuffer != NULL);
-        assert(dataWritten  != NULL);
-        assert(dataRead     != NULL);
+        inputMappedBuffer = (LPTCH)MapViewOfFile(
+            inputFileMap,
+            FILE_MAP_ALL_ACCESS,
+            0,
+            0,
+            inputBufferSize
+        );
 
+        outputMappedBuffer = (LPTCH)MapViewOfFile(
+            outputFileMap,
+            FILE_MAP_ALL_ACCESS,
+            0,
+            0,
+            outputBufferSize
+        );
+
+        assert(inputMappedBuffer != NULL);
+        assert(outputMappedBuffer != NULL);
+        assert(outputReady != NULL);
+        assert(inputReady != NULL);
     }
 
-    ~MutexSharedBuffer()
+    ~SynchronizedUpscaleBuffer()
     {
-        UnmapViewOfFile(mappedBuffer);
+        UnmapViewOfFile(inputMappedBuffer);
+        UnmapViewOfFile(outputMappedBuffer);
+
         if (createdNewObjects)
         {
-            CloseHandle(fileMap);
-            CloseHandle(dataRead);
-            CloseHandle(dataWritten);
+            CloseHandle(inputFileMap);
+            CloseHandle(outputFileMap);
+            CloseHandle(inputReady);
+            CloseHandle(outputReady);
         }
     }
 
     void Write(LPTCH bytes, int numBytes)
     {
-        WaitForSingleObject(dataRead, INFINITE);
-
-        memcpy(mappedBuffer, bytes, numBytes);
-
-        ReleaseSemaphore(dataWritten, 1, NULL);
+        memcpy(outputMappedBuffer, bytes, numBytes);
+        ReleaseSemaphore(outputReady, 1, NULL);
     }
 
     void Read(LPTCH bytes, int numBytesToRead)
     {
-        WaitForSingleObject(dataWritten, INFINITE);
-
-        memcpy(bytes, mappedBuffer, numBytesToRead);
-
-        ReleaseSemaphore(dataRead, 1, NULL);
+        WaitForSingleObject(inputReady, INFINITE);
+        memcpy(bytes, inputMappedBuffer, numBytesToRead);
     }
 };
 
 class ClientCommunicator
 {
 private:
-    MutexSharedBuffer* inputSharedBuffer;
-    MutexSharedBuffer* outputSharedBuffer;
+    SynchronizedUpscaleBuffer buffer;
 
     LONG  outputBufferSize;
 
@@ -96,14 +136,11 @@ private:
     LONG  inputBufferSize;
 public:
     ClientCommunicator(LONG inputBufferSize, LONG outputBufferSize, LPTCH nnInputBytes)
+        : buffer("ssre", inputBufferSize, outputBufferSize)
     {
         inputBytes = nnInputBytes;
         this->inputBufferSize = inputBufferSize;
         this->outputBufferSize = outputBufferSize;
-
-        
-        inputSharedBuffer = new MutexSharedBuffer("ssreInput", inputBufferSize);
-        outputSharedBuffer = new MutexSharedBuffer("ssreOutput", outputBufferSize);
     }
 
     ~ClientCommunicator()
@@ -114,13 +151,13 @@ public:
     // Blocking method: Submit data to NN and populate NN output buffer with received data
     void GetSRInputs()
     {
-        inputSharedBuffer->Read(inputBytes, inputBufferSize);
-        
+        buffer.Read(inputBytes, inputBufferSize);
     }
 
+    // This method will not block: reason is if we read, we will need to write
     void ReturnSROutputs(LPTCH nnOutputBytes)
     {
-        outputSharedBuffer->Write(nnOutputBytes, outputBufferSize);
+        buffer.Write(nnOutputBytes, outputBufferSize);
     }
 };
 
