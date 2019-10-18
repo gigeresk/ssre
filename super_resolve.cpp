@@ -12,9 +12,9 @@
 #define _DEBUG 1
 
 #ifdef _DEBUG // or #ifndef NDEBUG
-#define LOG_MSG(...) printf(__VA_ARGS__) // Or simply LOG_MSG(msg) printf(msg)
+#define LOG_MSG(...) printf( __VA_ARGS__ ) // Or simply LOG_MSG( msg ) printf( msg )
 #else
-#define LOG_MSG(...)                     // Or LOG_MSG(msg)
+#define LOG_MSG(...)                     // Or LOG_MSG( msg )
 #endif
 
 /* TODO
@@ -22,114 +22,114 @@
   -want to have out_img_y be on heap or on stack
   -intelligently use CV_32F and CV_8U
   -difference between torch::from_blob and at::from_blob??
-  -detach: http://www.bnikolic.co.uk/blog/pytorch-detach.html (heap/stack)
+  -detach: http://www.bnikolic.co.uk/blog/pytorch-detach.html ( heap/stack )
   bookmarks
   -https://github.com/pytorch/pytorch/issues/12506s
  */
 
 
-int loadImage(std::string image_path, std::vector<uchar> *buf){
+int loadImage( std::string image_path, std::vector<uchar> *buf ){
 
-    cv::Mat bgr_image = cv::imread(image_path, cv::IMREAD_COLOR );
+    cv::Mat bgr_image = cv::imread( image_path, cv::IMREAD_COLOR );
     // std::vector<uchar>* buf;
     try{
-        cv::imencode(".jpg", bgr_image, *buf);
+        cv::imencode( ".jpg", bgr_image, *buf );
     }
     catch(...){
-        std::cerr << "Could not encode image into memory";
+        std::cerr << "Could not encode image into memory" << std::endl;
         return 1;
     }
     return 0;
 }
 
-// int loadImageFolder(std::string image_path_dir, std::vector<std:vector<uchar>* > buf_array){
+// int loadImageFolder( std::string image_path_dir, std::vector<std:vector<uchar>* > buf_array ){
 //     std::vector<string> filenames; // list of filenames in image dir
-//     cv::glob(image_path_dir,fn,false);
+//     cv::glob( image_path_dir,fn,false );
 
 // }
-int main(int argc, const char* argv[]) {
+int main( int argc, const char* argv[]) {
     
     // time_t initial_time, load_time, upscaling_time, final_time;
     std::chrono::high_resolution_clock::time_point initial_time = std::chrono::high_resolution_clock::now();
 
-    if (argc != 3) {
+    if ( argc != 3 ) {
         std::cerr << "usage: example-app <path-to-exported-script-module> <path-to-image> \n";
         return -1;
     }
 
     // Deserialize the ScriptModule from a file using torch::jit::load().
-    std::shared_ptr<torch::jit::script::Module> module = torch::jit::load(argv[1]);
+    std::shared_ptr<torch::jit::script::Module> module = torch::jit::load( argv[1] );
 
-    assert(module != nullptr);
+    assert( module != nullptr );
     std::cout << "ok, loaded module\n";
 
     // we decode the image in another subroutine, as a proof of concept
     std::vector<uchar> buf;
-    if ( loadImage(argv[2], &buf) ) {
-        std::cerr << "Could not load image from memory";
+    if ( loadImage( argv[2], &buf ) ) {
+        std::cerr << "Could not load image from memory" << std::endl;
         return 1;
     }
 
-    cv::Mat bgr_image = cv::imdecode(buf,cv::IMREAD_COLOR);
+    cv::Mat bgr_image = cv::imdecode( buf,cv::IMREAD_COLOR );
     cv::Mat ycbcr_image;
 
-    cv::cvtColor(bgr_image, ycbcr_image, cv::COLOR_BGR2YCrCb);
+    cv::cvtColor( bgr_image, ycbcr_image, cv::COLOR_BGR2YCrCb );
     std::vector<cv::Mat> chan;
-    cv::split(ycbcr_image,chan);
+    cv::split( ycbcr_image,chan );
     cv::Mat Y  = chan[0];
     cv::Mat Cb = chan[1];
     cv::Mat Cr = chan[2]; //TODO optimize
 
     //convert Y channel to tensor
-    at::Tensor tensor_image = torch::from_blob(Y.data, {1, 1, Y.rows, Y.cols}, at::kByte); //TODO is kByte appropriate?
-    tensor_image = tensor_image.to(at::kFloat); //will convert the 8-bit values into 32-bit floating points just as if you wrote static_cast<float>(b) where b is a byte
+    at::Tensor tensor_image = torch::from_blob( Y.data, {1, 1, Y.rows, Y.cols}, at::kByte ); //TODO is kByte appropriate?
+    tensor_image = tensor_image.to( at::kFloat ); //will convert the 8-bit values into 32-bit floating points just as if you wrote static_cast<float>( b ) where b is a byte
 
     /*MODEL*/
     std::vector<torch::jit::IValue> inputs;
-    inputs.emplace_back(tensor_image); //TODO pushback vs emplace back?
+    inputs.emplace_back( tensor_image ); //TODO pushback vs emplace back?
     
 
     std::chrono::high_resolution_clock::time_point load_time = std::chrono::high_resolution_clock::now();
 
-    at::Tensor output = module->forward(inputs).toTensor();
+    at::Tensor output = module->forward( inputs ).toTensor();
 
     std::chrono::high_resolution_clock::time_point upscaling_time = std::chrono::high_resolution_clock::now();
 
     at::Tensor detached_output = output[0].detach();
 
     const std::vector< int > size_vec = {Y.rows*2 ,Y.cols *2};
-    cv::Mat out_img_y = cv::Mat(size_vec, CV_32F);
+    cv::Mat out_img_y = cv::Mat( size_vec, CV_32F );
 
-    std::memcpy((void *) out_img_y.data, detached_output[0].data_ptr(), 4*detached_output.numel()); //TODO important: detached_output[0] vs detached_output (above line) 
+    std::memcpy( ( void *) out_img_y.data, detached_output[0].data_ptr(), 4*detached_output.numel() ); //TODO important: detached_output[0] vs detached_output ( above line ) 
     //keep one of above...
 
     // Seem not to need to clip between 0.0 and 255.0
 
-    cv::Mat out_img_cb = cv::Mat(Y.cols*2,Y.rows*2, CV_32F);
-    cv::resize(Cb, out_img_cb, cv::Size(Y.cols*2,Y.rows*2),2.0,2.0, cv::INTER_CUBIC );
+    cv::Mat out_img_cb = cv::Mat( Y.cols*2,Y.rows*2, CV_32F );
+    cv::resize( Cb, out_img_cb, cv::Size( Y.cols*2,Y.rows*2 ),2.0,2.0, cv::INTER_CUBIC );
 
-    cv::Mat out_img_cr = cv::Mat(Y.cols*2,Y.rows*2, CV_32F);
-    cv::resize(Cr, out_img_cr, cv::Size(Y.cols*2,Y.rows*2),2.0,2.0, cv::INTER_CUBIC );
+    cv::Mat out_img_cr = cv::Mat( Y.cols*2,Y.rows*2, CV_32F );
+    cv::resize( Cr, out_img_cr, cv::Size( Y.cols*2,Y.rows*2 ),2.0,2.0, cv::INTER_CUBIC );
 
     cv::Mat YCbCr_output;
 
-    // need to convert Y (back) to 8-bit unsigned
-    out_img_y.convertTo(out_img_y, CV_8U);
+    // need to convert Y ( back ) to 8-bit unsigned
+    out_img_y.convertTo( out_img_y, CV_8U );
 
     std::vector<cv::Mat> new_channels = { out_img_y, out_img_cb, out_img_cr };
-    cv::merge(new_channels, YCbCr_output);
+    cv::merge( new_channels, YCbCr_output );
 
     cv::Mat final_result;
 
-    cv::cvtColor(YCbCr_output, final_result, cv::COLOR_YCrCb2BGR);
+    cv::cvtColor( YCbCr_output, final_result, cv::COLOR_YCrCb2BGR );
    
     std::chrono::high_resolution_clock::time_point final_time = std::chrono::high_resolution_clock::now();
 
 
-    std::chrono::duration<double> load_timespan = std::chrono::duration_cast<std::chrono::duration<double>>(load_time - initial_time);
-    std::chrono::duration<double> upscaling_timespan = std::chrono::duration_cast<std::chrono::duration<double>>(upscaling_time - load_time);
-    std::chrono::duration<double> final_timespan = std::chrono::duration_cast<std::chrono::duration<double>>(final_time - upscaling_time);
-    std::chrono::duration<double> total_timespan = std::chrono::duration_cast<std::chrono::duration<double>>(final_time - initial_time);
+    std::chrono::duration<double> load_timespan = std::chrono::duration_cast<std::chrono::duration<double>>( load_time - initial_time );
+    std::chrono::duration<double> upscaling_timespan = std::chrono::duration_cast<std::chrono::duration<double>>( upscaling_time - load_time );
+    std::chrono::duration<double> final_timespan = std::chrono::duration_cast<std::chrono::duration<double>>( final_time - upscaling_time );
+    std::chrono::duration<double> total_timespan = std::chrono::duration_cast<std::chrono::duration<double>>( final_time - initial_time );
     std::cout << "Loading took "        << load_timespan.count()        << " seconds" << std::endl;
     std::cout << "Upscaling took "      << upscaling_timespan.count()   << " seconds" << std::endl;
     std::cout << "Finalizing took "     << final_timespan.count()       << " seconds" << std::endl;
