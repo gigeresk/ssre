@@ -6,6 +6,15 @@
 There are sub-READMEs in util/, dataset/
 
 Build note: CMakeLists.txt is currently hardcoded to Linux paths on Fred's machine, please change it to suit your needs and delete it from the git repo if necessary.
+## Build Notes
+### How to build
+Assuming you have the necessary dependencies, and you're on Linux, cd into build and modify the file to use your own paths if I haven't done it already.
+`cd build`
+`cmake ..`
+`make`
+and then run build/super_resolve with the proper arguments.
+
+
 
 
 Below is the README for the pytorch example code (python)
