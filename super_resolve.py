@@ -1,4 +1,5 @@
 from __future__ import print_function
+from sarrmodel import Net
 import argparse
 import torch
 from PIL import Image
@@ -18,13 +19,18 @@ print(opt)
 img = Image.open(opt.input_image).convert('YCbCr')
 y, cb, cr = img.split()
 
-model = torch.load(opt.model)
+model = Net(upscale_factor=2)
+if opt.cuda:
+    model = model.to(device)
+
+checkpoint = torch.load(opt.model)
+
+model.load_state_dict( checkpoint['model_state_dict'] )
 img_to_tensor = ToTensor()
-# import pdb; pdb.set_trace()
+
 input = img_to_tensor(y).view(1, -1, y.size[1], y.size[0])
 
 if opt.cuda:
-    model = model.cuda()
     input = input.cuda()
 
 out = model(input)

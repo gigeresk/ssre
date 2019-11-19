@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from model import Net
+from sarrmodel import Net
 from data import get_training_set, get_test_set
 
 
@@ -80,7 +80,11 @@ def run():
 
     def checkpoint(epoch):
         model_out_path = "models/model_epoch_{}.pth".format(epoch)
-        torch.save(model, model_out_path)
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict()
+            }, model_out_path)
         print("Checkpoint saved to {}".format(model_out_path))
 
 
