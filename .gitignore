@@ -3,6 +3,17 @@ __pycache__/
 .vscode/
 .idea/
 
+# Heavy third-party binary distributions — download separately (see README)
+libtorch/
+opencv/
+
+# Input/output image files
+input/
+output/
+
+# Intermediate training checkpoints (keep named/final models)
+models/model_epoch_*.pth
+
 # Ignore the data inside the training/testing folders
 /dataset/training/*
 /dataset/testing/*

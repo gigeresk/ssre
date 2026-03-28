@@ -1,18 +1,43 @@
--Please use python3
--Need opencv (3.2)
--Need cuda 10 (optional)
--Need torchlib
+# Super Resolution Engine
 
-There are sub-READMEs in util/, dataset/
+Real-time super-resolution using a C++ inference engine (LibTorch + OpenCV) paired with a PyTorch training pipeline.
 
-Build note: CMakeLists.txt is currently hardcoded to Linux paths on Fred's machine, please change it to suit your needs and delete it from the git repo if necessary.
-## Build Notes
-### How to build
-Assuming you have the necessary dependencies, and you're on Linux, cd into build and modify the file to use your own paths if I haven't done it already.
-`cd build`
-`cmake ..`
-`make`
-and then run build/super_resolve with the proper arguments.
+## Dependencies
+
+| Dependency | Version | Notes |
+|---|---|---|
+| [LibTorch](https://pytorch.org/get-started/locally/) | **1.4.0** | C++ distribution — download the cxx11 ABI build |
+| [OpenCV](https://opencv.org/releases/) | **4.2.0** | Build from source or use a pre-built release |
+| CUDA | 10.x | Optional — CPU-only build works without it |
+| Python | 3.x | Required for training scripts |
+
+Download LibTorch 1.4.0: https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-1.4.0%2Bcpu.zip
+(swap `cpu` for `cu101` if building with CUDA 10.1)
+
+Extract both `libtorch/` and `opencv/` into the project root — they are excluded from git due to size.
+
+There are sub-READMEs in `util/`, `dataset/`
+
+## Build Notes (C++ engine)
+
+```bash
+mkdir build && cd build
+cmake ..
+make
+```
+
+By default CMakeLists.txt looks for `libtorch/` and `opencv/` relative to the project root.
+To use system-installed versions, pass their paths explicitly:
+
+```bash
+cmake .. -DCMAKE_PREFIX_PATH="/path/to/libtorch;/path/to/opencv/build"
+```
+
+Run the built binary:
+
+```bash
+./build/super_resolve <args>
+```
 
 
 
