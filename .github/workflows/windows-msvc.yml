@@ -34,9 +34,9 @@ jobs:
         run: |
           $ProgressPreference = 'SilentlyContinue'
           Invoke-WebRequest "https://download.pytorch.org/libtorch/cpu/libtorch-win-shared-with-deps-$env:LIBTORCH_VERSION%2Bcpu.zip" -OutFile libtorch.zip
-          7z x libtorch.zip -o. -y | Out-Null
+          7z x libtorch.zip -y | Out-Null
           Invoke-WebRequest "https://github.com/opencv/opencv/releases/download/$env:OPENCV_VERSION/opencv-$env:OPENCV_VERSION-windows.exe" -OutFile opencv.exe
-          7z x opencv.exe -o. -y | Out-Null
+          7z x opencv.exe -y | Out-Null
           Remove-Item libtorch.zip, opencv.exe
 
       - name: Configure
