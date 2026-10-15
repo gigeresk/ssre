@@ -6,41 +6,61 @@ Real-time super-resolution using a C++ inference engine (LibTorch + OpenCV) pair
 
 | Dependency | Version | Notes |
 |---|---|---|
-| [LibTorch](https://pytorch.org/get-started/locally/) | **1.4.0** | C++ distribution — download the cxx11 ABI build |
-| [OpenCV](https://opencv.org/releases/) | **4.2.0** | Build from source or use a pre-built release |
-| CUDA | 10.x | Optional — CPU-only build works without it |
-| Python | 3.x | Required for training scripts |
+| [LibTorch](https://pytorch.org/get-started/locally/) | **2.x** (tested 2.14.1) | C++ distribution; requires a C++20 compiler |
+| [OpenCV](https://opencv.org/releases/) | **4.x** (tested 4.6 on Linux, 4.14 on Windows) | Use 4.13+ with Visual Studio 2026 |
+| CMake | 3.21+ | |
+| Compiler | MSVC 2022 / 2026, GCC 11+, Clang 14+ | |
+| CUDA | optional | Use a CUDA build of LibTorch; the engine picks CUDA automatically when available |
+| Python | 3.x | Training scripts and TorchScript export |
 
-Download LibTorch 1.4.0: https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-1.4.0%2Bcpu.zip
-(swap `cpu` for `cu101` if building with CUDA 10.1)
+Extract `libtorch/` and `opencv/` into the project root (they are git-ignored), or point
+`CMAKE_PREFIX_PATH` at them.
 
-Extract both `libtorch/` and `opencv/` into the project root — they are excluded from git due to size.
+## Build: Windows (MSVC)
 
-There are sub-READMEs in `util/`, `dataset/`
+1. Download **LibTorch → Windows → C++ → Release** from https://pytorch.org/get-started/locally/
+   (e.g. `libtorch-win-shared-with-deps-2.14.1+cpu.zip`) and extract it so you have `libtorch\share\cmake\Torch`.
+2. Download the OpenCV Windows release (`opencv-4.14.0-windows.exe`), run it, and extract into the project
+   root so you have `opencv\build\OpenCVConfig.cmake`.
+3. Either open the folder in Visual Studio (it picks up `CMakePresets.json`; choose **Windows x64 Release**), or
+   from a *Developer PowerShell for VS*:
 
-## Build Notes (C++ engine)
-
-```bash
-mkdir build && cd build
-cmake ..
-make
+```powershell
+cmake -S . -B build -A x64
+cmake --build build --config Release
+build\Release\super_resolve.exe model.pt input\Witcher3_demo-240.png
 ```
 
-By default CMakeLists.txt looks for `libtorch/` and `opencv/` relative to the project root.
-To use system-installed versions, pass their paths explicitly:
+The LibTorch and OpenCV DLLs are copied next to the `.exe` automatically.
+
+**Release only.** The standard LibTorch download links the release CRT, so a Debug build crashes at runtime.
+CMake therefore only offers Release/RelWithDebInfo. For a true Debug build, download the separate
+*debug* LibTorch package and configure with `-DSSRE_LIBTORCH_DEBUG=ON`.
+
+For the Unity shared-memory mode, add `-DSSRE_ENGINE=ON` (or use the `windows-engine` preset).
+
+## Build: Linux
 
 ```bash
-cmake .. -DCMAKE_PREFIX_PATH="/path/to/libtorch;/path/to/opencv/build"
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_PREFIX_PATH="$(python3 -c 'import torch;print(torch.utils.cmake_prefix_path)')"
+cmake --build build -j
+./build/super_resolve model.pt input/Witcher3_demo-240.png [cpu|cuda]
 ```
 
-Run the built binary:
+(A pip-installed `torch` works as the LibTorch here; system OpenCV via `libopencv-dev`.)
+
+## Model files
+
+`super_resolve` loads a **TorchScript** file, not a `.pth`. Export one with the same PyTorch version as your LibTorch:
 
 ```bash
-./build/super_resolve <args>
+python util/to_torchscript.py --model models/model_epoch_30.pth --output model.pt
 ```
 
-
-
+The checked-in `util/traced-script-module.pt` is in the pre-1.4 "legacy" TorchScript format and cannot be loaded
+by any current LibTorch; re-export it as above. The engine is hard-wired for 2x models (`models/model_epoch_*.pth`,
+`archive/witcher3_2x`); the `borderlands2` and `BSDS300` checkpoints are 3x.
 
 Below is the README for the pytorch example code (python)
 # Superresolution using an efficient sub-pixel convolutional neural network
