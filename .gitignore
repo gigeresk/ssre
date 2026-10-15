@@ -374,3 +374,7 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+# CMake / Visual Studio build trees
+build*/
+out/
+CMakeUserPresets.json
